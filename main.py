@@ -50,9 +50,6 @@ def wod_id(airtable, search_date):
                 # return wod_result
                 wod_record_id = record['id']
                 return wod_record_id
-            # else:
-            #     error_message = "No WOD. How about some rest instead?"
-            #     return error_message
 
 
 # airtable function to return the result based on database_id
@@ -99,27 +96,23 @@ def view(update, context):
     # extract parameters from /view function
     context_result = context.args
     print("context result", context_result)
-    search_query = context_result[0]
-    print("search query from view", search_query)
-
-    # print("result 1", date_format_check(search_query))
-
-    # # check the date formatting parameters
-    if date_format_check(search_query):  # if date is YYYY-MM-DD
-        main_result_id = wod_id(airtable, search_date=search_query)
-        main_result = wod_result(main_result_id)
+    if len(context_result) > 1:  # check the length of the context paramaters
+        main_result = "Please key in a date!"
+    elif bool(re.search(
+            "[ a-zA-Z ]",
+            context_result[0])):  # check whether parameter are in alphabert
+        main_result = "please key in a date in this format, DD-MM-YYYY"
     else:
-        formatted_date = date_converter(search_query)
-        main_result_id = wod_id(airtable, search_date=formatted_date)
-        main_result = wod_result(main_result_id)
-
-    # convert parameters to required search function
-    # date = date_converter(search_query)
-    # print("date /view", date)
-
-    # retrieve the searched result
-    # main_result = wod_result(airtable, search_date=search_query)
-    # print("main result", main_result)
+        search_query = context_result[0]
+        print("search query from view", search_query)
+        # # check the date formatting parameters
+        if date_format_check(search_query):  # if date is YYYY-MM-DD
+            main_result_id = wod_id(airtable, search_date=search_query)
+            main_result = wod_result(main_result_id)
+        else:  # if date is DD-MM-YYYY
+            formatted_date = date_converter(search_query)
+            main_result_id = wod_id(airtable, search_date=formatted_date)
+            main_result = wod_result(main_result_id)
     bot.send_message(chat_id=update.effective_chat.id, text=main_result)
 
 
