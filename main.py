@@ -51,7 +51,7 @@ def test(update, context):
 
 # /help function
 def start(update, context):
-    welcome_message = "Welcome! Here are the available commands: \n \u2022 /help \n \u2022 /view \n \u2022 /test"
+    welcome_message = "Welcome! Here are the available commands: \n \u2022 /help \n \u2022 /view \n \u2022 /test \n \u2022 /conversion"
     bot.send_message(chat_id=update.effective_chat.id, text=welcome_message)
 
 
@@ -171,6 +171,9 @@ def conversion_process(input):
 
 # /conversion function
 def conversion(update, context) -> int:
+    user_data = bot.get_chat_administrators(update.effective_chat.id)
+    print("hello", user_data)
+    print("userdata", update.message.from_user)
     context_result_for_conversion = context.args
     # print("context_result", context_result_for_conversion)
     # print("context_result_len", len(context_result_for_conversion))
