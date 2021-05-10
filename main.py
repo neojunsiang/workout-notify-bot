@@ -127,43 +127,6 @@ def view(update, context):
     update.message.reply_text(main_result)
 
 
-# CONVERSATION BOT
-CHOOSING, WEIGHT_INPUT = range(2)
-
-reply_keyboard = [["Kilogram (kg)"], ["Pounds (lbs)"], ["Cancel"]]
-markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
-
-
-# /convert_my_weight function
-def weight_converter(update: Update, _: CallbackContext) -> int:
-    messsage = "Hi, I am your weight calculator, please select the type of conversion. \n If you wish to stop talking to me, you may press cancel"
-    update.message.reply_text(messsage, reply_markup=markup)
-    # return WEIGHT_INPUT
-    return CHOOSING
-
-
-# select on the conversion process
-def conversion_choice(update: Update, context: CallbackContext) -> int:
-    text = update.message.text
-    print("conversion choice", text)
-    context.user_data['choice'] = text
-    print("choice", context.user_data['choice'])
-    print(context.user_data)
-    if context.user_data['choice'] == "Kilogram (kg)":
-        update.message.reply_text(
-            f'{text.upper()}? Please input in the following format - xxx kg')
-        return WEIGHT_INPUT
-    elif context.user_data['choice'] == "Pounds (lbs)":
-        update.message.reply_text(
-            f'{text.upper()}? Please input in the following format - xxx lbs')
-        return WEIGHT_INPUT
-    elif context.user_data['choice'] == "Cancel":
-        update.message.reply_text(
-            "Sorry to see you go! Goodbye"
-        )  # to refactor to include cancel CommandHandler
-        return ConversationHandler.END
-
-
 # regex check for kg
 def weight_regex_check_for_kg(input):
     result = bool(re.search('^\d+(?:[.,][0|5])?\s*(kg|KG)$', input))
@@ -191,7 +154,7 @@ def conversion_process(input):
         converted_pound = round(integer_input * KILO_TO_POUND_CONVERSION, 1)
         final_converted_pound = round_to_nearest_point_five(converted_pound)
         # print("final converted pound", final_converted_pound)
-        result = f"{final_converted_pound} lbs"
+        result = f"Weight will be {final_converted_pound} lbs"
         return result
     elif weight_regex_check_for_lbs(input):
         integer_input = float(input.lower().strip("lbs"))
@@ -199,35 +162,30 @@ def conversion_process(input):
         final_converted_kilogram = round_to_nearest_point_five(
             converted_kilogram)
         # print("final converted kilogram", final_converted_kilogram)
-        result = f"{final_converted_kilogram} kg"
+        result = f"Weight will be {final_converted_kilogram} kg"
         return result
     else:
-        error_message = "Only one input is allowed! Please check your unit too, only kg or lbs."
+        error_message = "Only one input and check you unit, only kg or lbs!"
         return error_message
 
 
-# conversion function
-def conversion(update: Update, context: CallbackContext) -> int:
-    user = update.message.from_user
-    # print("user", user)
-    input_weight = update.message.text
-    # print("text", input_weight)
-    result = conversion_process(input_weight)
-    # print("result", result)
-    converted_weight = result
-    update.message.reply_text(converted_weight)
-    return ConversationHandler.END
-    # pass
-
-
-# /cancel function
-def cancel(update: Update, _: CallbackContext):
-    user = update.message.from_user
-    print("user", user)
-    print("update", update.message)
-    cancel_message = "Sorry to see you go! Goodbye"
-    update.message.reply_text(cancel_message)
-    return ConversationHandler.END
+# /conversion function
+def conversion(update, context) -> int:
+    context_result_for_conversion = context.args
+    # print("context_result", context_result_for_conversion)
+    # print("context_result_len", len(context_result_for_conversion))
+    if len(context_result_for_conversion) == 0:
+        result = "Please key in your weight"
+    else:
+        print("conversion", context_result_for_conversion)
+        user = update.message.from_user
+        # print("user", user)
+        input_weight = (update.message.text).lstrip("/conversion ")
+        # print("text1", input_weight)
+        result = conversion_process(input_weight)
+        # print("result", result)
+        # pass
+    return update.message.reply_text(result)
 
 
 # main function
@@ -236,27 +194,19 @@ def main():
 
     dp = updater.dispatcher
 
-    conv_handler = ConversationHandler(
-        #conversation initiator
-        entry_points=[CommandHandler('convert_my_weight', weight_converter)],
-        states={
-            CHOOSING: [
-                MessageHandler(
-                    Filters.regex(
-                        '^(Kilogram\s\(kg\)|Pounds\s\(lbs\)|Cancel)$'),
-                    conversion_choice)
-            ],
-            WEIGHT_INPUT:
-            [MessageHandler(Filters.text & (~Filters.command), conversion)]
-        },
-        fallbacks=[CommandHandler('cancel', cancel)])
-
+    # command handler for /test
     dp.add_handler(CommandHandler("test", test))
+
+    # command handler for /start
     dp.add_handler(CommandHandler("start", start))
+
+    # command handler for view
     dp.add_handler(CommandHandler("view", view))
-    # dp.add_handler(CommandHandler('calculate', convert_weight))
-    # dp.add_handler(CommandHandler('cancel', cancel))
-    dp.add_handler(conv_handler)
+
+    # command handler for conversation
+    dp.add_handler(CommandHandler("conversion", conversion))
+
+    # dp.add_handler(conv_handler)
 
     updater.start_polling()
 
@@ -265,3 +215,9 @@ def main():
 
 if __name__ == '__main__':
     main()
+"""
+test - for testing purpose
+start - to check for available commands
+view - to view workouts, date, should be formatted as dd-mm-yyyy
+conversion - unsure of the pounds-to-kg conversion? Formatted as xxx lbs / xxx kg
+"""
