@@ -16,6 +16,7 @@ import json
 import requests
 import re
 import logging
+from functools import wraps
 
 # API keys
 load_dotenv()
@@ -24,6 +25,7 @@ load_dotenv(dotenv_path=env_path)
 TELEGRAM_API_TOKEN = os.getenv("SECRET_TELEGRAM_API_TOKEN")
 bot = Bot(TELEGRAM_API_TOKEN)
 CHAT_ID = os.getenv("SECRET_CHAT_ID")
+LIST_OF_ADMINS = [132502315]
 
 AIRTABLE_BASE_KEY = os.getenv("SECRET_AIRTABLE_BASE_KEY")
 AIRTABLE_TABLE_NAME = os.getenv("SECRET_AIRTABLE_TABLE_NAME")
@@ -171,8 +173,6 @@ def conversion_process(input):
 
 # /conversion function
 def conversion(update, context) -> int:
-    user_data = bot.get_chat_administrators(update.effective_chat.id)
-    print("hello", user_data)
     print("userdata", update.message.from_user)
     context_result_for_conversion = context.args
     # print("context_result", context_result_for_conversion)
@@ -189,6 +189,58 @@ def conversion(update, context) -> int:
         # print("result", result)
         # pass
     return update.message.reply_text(result)
+
+
+# Admin Access
+def restricted(func):
+    @wraps(func)
+    def wrapped(update, context, *args, **kwargs):
+        user_id = update.effective_user.id
+        user_name = update.effective_user.username
+        print("username", user_name)
+        if user_id not in LIST_OF_ADMINS:
+            print(
+                "Unauthorized access denied for id: {}, username: {}.".format(
+                    user_id, user_name))
+            error_message = "Only the admins have access"
+            update.message.reply_text(text=error_message)
+            return
+        return func(update, context, *args, **kwargs)
+
+    return wrapped
+
+
+# /create function
+@restricted
+def create(update, context):
+    reply_keyboard = [['Create', 'Edit', 'Delete']]
+    message = "Please select your action, or send /cancel if you wish to stop"
+    # bot.send_message(chat_id=update.effective_chat.id, text=test_message)
+    update.message.reply_text(message,
+                              reply_markup=ReplyKeyboardMarkup(
+                                  reply_keyboard, one_time_keyboard=True))
+    return CHOOSING
+
+
+@restricted
+def action(update: Update, context: CallbackContext) -> int:
+    text = update.message.text
+    context.user_data['choice'] = text
+    if text == "Create":
+        pass
+    elif text == "Edit":
+        pass
+    elif text == "Delete":
+        pass
+
+
+conv_handler = ConversationHandler(
+    entry_points=[CommandHandler('create', create)],
+    states={
+        CHOOSING:
+        [MessageHandler(Filters.regex('^(Create|Edit|Delete)$')), action],
+    },
+    fallbacks=[CommandHandler('cancel', cancel)])
 
 
 # main function
@@ -208,6 +260,9 @@ def main():
 
     # command handler for conversation
     dp.add_handler(CommandHandler("conversion", conversion))
+
+    # command handler for create workout
+    dp.add_handler(CommandHandler("create", create))
 
     # dp.add_handler(conv_handler)
 
