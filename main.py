@@ -210,10 +210,15 @@ def restricted(func):
     return wrapped
 
 
+# CONVERSARTION BOT ON Create, Edit & Delete, Only for ADMINS.
+CHOOSING, NEW_DATE_SELECTION, NEW_WORKOUT_SELECTION, DELETE_SELECTION, EDIT_SELECTION = range(
+    5)
+
+
 # /create function
 @restricted
 def create(update, context):
-    reply_keyboard = [['Create', 'Edit', 'Delete']]
+    reply_keyboard = [['New'], ['Edit'], ['Delete']]
     message = "Please select your action, or send /cancel if you wish to stop"
     # bot.send_message(chat_id=update.effective_chat.id, text=test_message)
     update.message.reply_text(message,
@@ -222,23 +227,99 @@ def create(update, context):
     return CHOOSING
 
 
+# new workout
 @restricted
-def action(update: Update, context: CallbackContext) -> int:
+def new(update: Update, context: CallbackContext):
+    choice = update.message.text
+    print("choice", choice)
+    update.message.reply_text(
+        "{} workout ? Please input the date you wish to add".format(choice))
+    return NEW_DATE_SELECTION
+
+
+# convert keyed date into the required date for insertion in airtable
+def date_conversion_for_insert(date):
+    result = datetime.datetime.strptime(date, "%d-%m-%Y").strftime("%m-%d-%Y")
+    return result
+
+
+# airtable insertion
+def airtable_insertion(input_date, input_workout):
+    converted_date = str(date_conversion_for_insert(input_date))
+    record = {"date": converted_date, "wod": input_workout}
+    print("record", record)
+    airtable.insert(record)
+    return
+
+
+# ask for the date to be added into db
+@restricted
+def insert_new_date(update: Update, context: CallbackContext):
+    user_data = context.user_data
+    print("user_data", user_data)
     text = update.message.text
-    context.user_data['choice'] = text
-    if text == "Create":
-        pass
-    elif text == "Edit":
-        pass
-    elif text == "Delete":
-        pass
+    print("text", text)
+    user_data['date'] = text
+    print('after', user_data)
+    update.message.reply_text("Please add the workout")
+    return NEW_WORKOUT_SELECTION
+
+
+# ask for the workout to be added into db
+@restricted
+def insert_new_workout(update: Update, context: CallbackContext):
+    user_data = context.user_data
+    print("new_workout", user_data)
+    new_workout = update.message.text
+    print("new workout", new_workout)
+    user_data['wod'] = new_workout
+    print("after wod user", user_data)
+    try:
+        airtable_insertion(user_data['date'], user_data['wod'])
+        update.message.reply_text("Added to DB")
+    except:
+        update.message.reply_text(
+            "Error with date or data, please check again")
+    del user_data
+    return ConversationHandler.END
+
+
+@restricted
+def edit(update: Update, context: CallbackContext):
+    update.message.reply_text("Please input the date you wish to edit")
+    # return EDIT_SELECTION
+
+
+@restricted
+def delete(update: Update, context: CallbackContext):
+    update.message.reply_text("Please input the date you wish to delete")
+    # return DELETE_SELECTION
+
+
+@restricted
+def cancel(update: Update, context: CallbackContext):
+    user_data = context.user_data
+    print("userdata", user_data)
+    if 'choice' in user_data:
+        del user_data['choice']
+    update.message.reply_text("Goodbye")
+    return ConversationHandler.END
 
 
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler('create', create)],
     states={
-        CHOOSING:
-        [MessageHandler(Filters.regex('^(Create|Edit|Delete)$')), action],
+        CHOOSING: [
+            MessageHandler(Filters.regex('^New$'), new),
+            MessageHandler(Filters.regex('^Edit$'), edit),
+            MessageHandler(Filters.regex('^Delete$'), delete)
+        ],
+        NEW_DATE_SELECTION:
+        [MessageHandler(Filters.text & (~Filters.command), insert_new_date)],
+        NEW_WORKOUT_SELECTION: [
+            MessageHandler(Filters.text & (~Filters.command),
+                           insert_new_workout),
+        ]
     },
     fallbacks=[CommandHandler('cancel', cancel)])
 
@@ -262,9 +343,9 @@ def main():
     dp.add_handler(CommandHandler("conversion", conversion))
 
     # command handler for create workout
-    dp.add_handler(CommandHandler("create", create))
+    # dp.add_handler(CommandHandler("create", create))
 
-    # dp.add_handler(conv_handler)
+    dp.add_handler(conv_handler)
 
     updater.start_polling()
 
