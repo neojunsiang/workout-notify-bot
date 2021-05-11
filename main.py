@@ -1,12 +1,7 @@
 from telegram import *
-from telegram.ext import (
-    Updater,
-    CommandHandler,
-    MessageHandler,
-    Filters,
-    ConversationHandler,
-    CallbackContext,
-)
+from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
+                          ConversationHandler, CallbackContext,
+                          CallbackQueryHandler)
 from airtable import Airtable
 from dotenv import load_dotenv
 from pathlib import Path
@@ -25,7 +20,7 @@ load_dotenv(dotenv_path=env_path)
 TELEGRAM_API_TOKEN = os.getenv("SECRET_TELEGRAM_API_TOKEN")
 bot = Bot(TELEGRAM_API_TOKEN)
 CHAT_ID = os.getenv("SECRET_CHAT_ID")
-LIST_OF_ADMINS = [132502315]
+LIST_OF_ADMINS = os.getenv("LIST_OF_ADMINS")  # use ['xxx', 'xxx'] in .env
 
 AIRTABLE_BASE_KEY = os.getenv("SECRET_AIRTABLE_BASE_KEY")
 AIRTABLE_TABLE_NAME = os.getenv("SECRET_AIRTABLE_TABLE_NAME")
@@ -109,7 +104,9 @@ def view(update, context):
     print("user_context", context)  # obtain the chat and user info
 
     if len(context_result) > 1:  # check the length of the context paramaters
-        main_result = "Please key in a date!"
+        main_result = "Please key in one date only!"
+    elif context_result == []:
+        main_result = "please include a date as stated on the command description"
     elif bool(re.search(
             "[ a-zA-Z ]",
             context_result[0])):  # check whether parameter are in alphabert
@@ -195,7 +192,7 @@ def conversion(update, context) -> int:
 def restricted(func):
     @wraps(func)
     def wrapped(update, context, *args, **kwargs):
-        user_id = update.effective_user.id
+        user_id = str(update.effective_user.id)
         user_name = update.effective_user.username
         print("username", user_name)
         if user_id not in LIST_OF_ADMINS:
@@ -211,30 +208,32 @@ def restricted(func):
 
 
 # CONVERSARTION BOT ON Create, Edit & Delete, Only for ADMINS.
-CHOOSING, NEW_DATE_SELECTION, NEW_WORKOUT_SELECTION, DELETE_SELECTION, EDIT_SELECTION = range(
+CHOOSING, DATE_SELECTION, NEW_WORKOUT_SELECTION, DELETE_SELECTION, EDIT_SELECTION = range(
     5)
+
+reply_keyboard = [['New'], ['Edit'], ['Delete']]
+markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
 
 
 # /create function
 @restricted
-def create(update, context):
-    reply_keyboard = [['New'], ['Edit'], ['Delete']]
+def create(update: Update, _: CallbackContext):
     message = "Please select your action, or send /cancel if you wish to stop"
-    # bot.send_message(chat_id=update.effective_chat.id, text=test_message)
-    update.message.reply_text(message,
-                              reply_markup=ReplyKeyboardMarkup(
-                                  reply_keyboard, one_time_keyboard=True))
+    update.message.reply_text(message, reply_markup=markup)
     return CHOOSING
 
 
-# new workout
+# new workout (path : CHOOSING)
 @restricted
-def new(update: Update, context: CallbackContext):
+def action(update: Update, context: CallbackContext):
+    user_data = context.user_data
     choice = update.message.text
+    user_data['choice'] = choice
     print("choice", choice)
+    print("user_data in new", user_data)
     update.message.reply_text(
-        "{} workout ? Please input the date you wish to add".format(choice))
-    return NEW_DATE_SELECTION
+        "{} workout ? Please input the date in DD-MM-YYYY".format(choice))
+    return DATE_SELECTION
 
 
 # convert keyed date into the required date for insertion in airtable
@@ -256,53 +255,113 @@ def airtable_insertion(input_date, input_workout):
 @restricted
 def insert_new_date(update: Update, context: CallbackContext):
     user_data = context.user_data
-    print("user_data", user_data)
+    if 'date' and 'wod' in user_data:
+        del user_data['date']
+        del user_data['wod']
+    print("before user_data from insert_new_date", user_data)
     text = update.message.text
     print("text", text)
     user_data['date'] = text
-    print('after', user_data)
-    update.message.reply_text("Please add the workout")
-    return NEW_WORKOUT_SELECTION
+    print('after user_data from insert_new_date', user_data)
+    if user_data['choice'] == 'New':
+        update.message.reply_text("Please add the workout")
+        return NEW_WORKOUT_SELECTION
+    elif user_data['choice'] == 'Delete':  # result 14-05-2021
+        print("user_data in delete", user_data)
+        deleting_date = user_data['date']
+        print('deleting date', deleting_date)
+        formatted_deleting_date = date_converter(deleting_date)
+        print("formatted deleted date", formatted_deleting_date)
+        deleted_wod_id = wod_id(airtable, formatted_deleting_date)
+        print("deleted_wod_id", deleted_wod_id)
+        user_data['delete_wod_id'] = deleted_wod_id
+        deleted_wod = wod_result(deleted_wod_id)  #last appended wod
+        print('deleted wod', deleted_wod)
+        user_data['deleted_wod'] = deleted_wod
+        inline_keyboard = [
+            [
+                InlineKeyboardButton("Yes", callback_data='Yes'),
+                InlineKeyboardButton("No", callback_data='No'),
+            ],
+        ]
+        inline_reply_markup = InlineKeyboardMarkup(inline_keyboard)
+        update.message.reply_text(
+            "{}\n\n\bConfirm Deletion?\b".format(deleted_wod),
+            reply_markup=inline_reply_markup)
+        return DELETE_SELECTION
 
 
 # ask for the workout to be added into db
 @restricted
 def insert_new_workout(update: Update, context: CallbackContext):
     user_data = context.user_data
-    print("new_workout", user_data)
+    print("before for user_date in insert_new_workout", user_data)
     new_workout = update.message.text
     print("new workout", new_workout)
     user_data['wod'] = new_workout
-    print("after wod user", user_data)
+    print("after for user_date in insert_new_workout", user_data)
     try:
         airtable_insertion(user_data['date'], user_data['wod'])
-        update.message.reply_text("Added to DB")
+        update.message.reply_text("Added to DB",
+                                  reply_markup=ReplyKeyboardRemove())
     except:
         update.message.reply_text(
             "Error with date or data, please check again")
-    del user_data
+    user_data.clear()
     return ConversationHandler.END
 
 
+# edit workout (path : CHOOSING)
 @restricted
 def edit(update: Update, context: CallbackContext):
     update.message.reply_text("Please input the date you wish to edit")
     # return EDIT_SELECTION
 
 
+# delete workout (path : CHOOSING)
 @restricted
 def delete(update: Update, context: CallbackContext):
-    update.message.reply_text("Please input the date you wish to delete")
-    # return DELETE_SELECTION
+    user_data = context.user_data
+    print("user data in delete", user_data)
+    print("user data deleted id in delete", user_data['delete_wod_id'])
+    query = update.callback_query
+    print("query in delete", query)
+
+    if query.data.lower() == "yes":
+        try:
+            airtable.delete(user_data['delete_wod_id'])
+            query.answer()
+            query.edit_message_text(
+                text="Selected option has been deleted from database")
+            user_data.clear()
+        except:
+            query.answer()
+            query.edit_message_text(text="No record found in database")
+    elif query.data.lower() == "no":
+        query.answer()
+        query.edit_message_text(text="Not deleting from database, Goodbye!")
+        user_data.clear()
+    return ConversationHandler.END
+
+    # # CallbackQueries need to be answered, even if no notification to the user is needed
+    # # Some clients may have trouble otherwise. See https://core.telegram.org/bots/api#callbackquery
+    # query.answer()
+
+    # query.edit_message_text(text=f"Selected option: {query.data}")
+
+    # # update.message.reply_text("Please input the date you wish to delete")
+    # # return DELETE_SELECTION
 
 
+# cancel conversation (path: fallback)
 @restricted
 def cancel(update: Update, context: CallbackContext):
     user_data = context.user_data
     print("userdata", user_data)
     if 'choice' in user_data:
         del user_data['choice']
-    update.message.reply_text("Goodbye")
+    update.message.reply_text("Goodbye", reply_markup=ReplyKeyboardRemove())
+    user_data.clear()
     return ConversationHandler.END
 
 
@@ -310,16 +369,15 @@ conv_handler = ConversationHandler(
     entry_points=[CommandHandler('create', create)],
     states={
         CHOOSING: [
-            MessageHandler(Filters.regex('^New$'), new),
-            MessageHandler(Filters.regex('^Edit$'), edit),
-            MessageHandler(Filters.regex('^Delete$'), delete)
+            MessageHandler(Filters.regex('^(New|Edit|Delete)$'), action),
         ],
-        NEW_DATE_SELECTION:
+        DATE_SELECTION:
         [MessageHandler(Filters.text & (~Filters.command), insert_new_date)],
         NEW_WORKOUT_SELECTION: [
             MessageHandler(Filters.text & (~Filters.command),
                            insert_new_workout),
-        ]
+        ],
+        DELETE_SELECTION: [CallbackQueryHandler(delete)]
     },
     fallbacks=[CommandHandler('cancel', cancel)])
 
