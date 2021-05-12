@@ -51,7 +51,7 @@ def test(update, context):
 
 # /help function
 def start(update, context):
-    welcome_message = "Welcome! Here are the available commands: \n \u2022 /commands \n \u2022 /view \n \u2022 /test \n \u2022 /conversion"
+    welcome_message = "Welcome! Here are the available commands: \n \u2022 /start \n \u2022 /view \n \u2022 /test \n \u2022 /conversion"
     bot.send_message(chat_id=update.effective_chat.id, text=welcome_message)
 
 
@@ -516,7 +516,7 @@ if __name__ == '__main__':
     main()
 """
 test - for testing purpose
-commands - to check for available commands
+start - to check for available commands
 view - to view workouts, date, should be formatted as dd-mm-yyyy
 conversion - unsure of the pounds-to-kg conversion? Formatted as xxx lbs / xxx kg
 """
