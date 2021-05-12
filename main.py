@@ -501,7 +501,11 @@ def main():
 
     dp.add_handler(conv_handler)
 
-    updater.start_polling()
+    updater.start_webhook(listen="0.0.0.0",
+                          port=os.getenv("PORT"),
+                          url_path=TELEGRAM_API_TOKEN,
+                          webhook_url="https://workout-notify.herokuapp.com/" +
+                          TELEGRAM_API_TOKEN)
 
     updater.idle()
 
