@@ -20,7 +20,10 @@ load_dotenv(dotenv_path=env_path)
 TELEGRAM_API_TOKEN = os.getenv("SECRET_TELEGRAM_API_TOKEN")
 bot = Bot(TELEGRAM_API_TOKEN)
 CHAT_ID = os.getenv("SECRET_CHAT_ID")
-LIST_OF_ADMINS = os.getenv("LIST_OF_ADMINS")  # use ['xxx', 'xxx'] in .env
+LIST_OF_ADMINS = [
+    os.getenv("ADMIN_1"),
+    os.getenv("ADMIN_2"),
+]
 
 AIRTABLE_BASE_KEY = os.getenv("SECRET_AIRTABLE_BASE_KEY")
 AIRTABLE_TABLE_NAME = os.getenv("SECRET_AIRTABLE_TABLE_NAME")
@@ -208,8 +211,8 @@ def restricted(func):
 
 
 # CONVERSARTION BOT ON Create, Edit & Delete, Only for ADMINS.
-CHOOSING, DATE_SELECTION, NEW_WORKOUT_SELECTION, DELETE_SELECTION, EDIT_SELECTION = range(
-    5)
+CHOOSING, DATE_SELECTION, NEW_WORKOUT_SELECTION, DELETE_SELECTION, EDIT_SELECTION, EDIT_WORKOUT = range(
+    6)
 
 reply_keyboard = [['New'], ['Edit'], ['Delete']]
 markup = ReplyKeyboardMarkup(reply_keyboard,
@@ -220,7 +223,7 @@ markup = ReplyKeyboardMarkup(reply_keyboard,
 # /create function
 @restricted
 def create(update: Update, _: CallbackContext):
-    message = "Please select your action, or send /cancel if you wish to stop"
+    message = "Please select your action, or send /cancel if you wish to stop at any point"
     update.message.reply_text(message, reply_markup=markup)
     return CHOOSING
 
@@ -306,6 +309,36 @@ def date_selection(update: Update, context: CallbackContext):
                 reply_markup=inline_reply_markup,
                 parse_mode=ParseMode.HTML)
             return DELETE_SELECTION
+    elif user_data['choice'] == 'Edit':
+        print("user data in edit", user_data)
+        editing_date = user_data['date']
+        print("editing date", editing_date)
+        formatted_editing_date = date_converter(editing_date)
+        print("formatted edited date", formatted_editing_date)
+        edited_wod_id = wod_id(airtable, formatted_editing_date)
+        print("edited wod id", edited_wod_id)
+        if edited_wod_id == None:
+            update.message.reply_text(
+                "No WOD found in database, please key in another date in <b>DD-MM-YYYY</b>",
+                parse_mode=ParseMode.HTML)
+        else:
+            user_data['edited_wod_id'] = edited_wod_id
+            edited_wod = wod_result(edited_wod_id)
+            user_data['edited_wod'] = edited_wod
+            print("user_data in edited filtered", user_data)
+            inline_keyboard = [
+                [
+                    InlineKeyboardButton("Edit", callback_data='Edit'),
+                    InlineKeyboardButton("Pass", callback_data='Pass'),
+                ],
+            ]
+            inline_reply_markup = InlineKeyboardMarkup(inline_keyboard)
+            update.message.reply_text(
+                "<b>Workout to be Edited</b>\n\n{}\n\n<b><i>Confirm Edit?</i></b>"
+                .format(edited_wod),
+                reply_markup=inline_reply_markup,
+                parse_mode=ParseMode.HTML)
+            return EDIT_SELECTION
 
 
 # ask for the workout to be added into db
@@ -331,9 +364,63 @@ def insert_new_workout(update: Update, context: CallbackContext):
 
 # edit workout (path : CHOOSING)
 @restricted
-def edit(update: Update, context: CallbackContext):
-    update.message.reply_text("Please input the date you wish to edit")
+def edit_selection(update: Update, context: CallbackContext):
+    user_data = context.user_data
+    print("user data in edit_selection", user_data)
+    print("user data edited id in edit_selection", user_data['edited_wod_id'])
+    query = update.callback_query
+    print("query in edit", query)
+    if query.data.lower() == "edit":
+        query.answer()
+        query.edit_message_text(
+            text="Kindly input the new workout for:\n\n<i>{}</i>".format(
+                user_data['edited_wod']),
+            parse_mode=ParseMode.HTML)
+        return EDIT_WORKOUT
+    elif query.data.lower() == "pass":
+        query.answer()
+        query.edit_message_text(text="No edit required, Goodbye!")
+        user_data.clear()
+        return ConversationHandler.END
+
+    # update.message.reply_text("Please input the date you wish to edit")
     # return EDIT_SELECTION
+
+
+# update airtable function
+def airtable_update(edit_id, edit_data):
+    fields = {'wod': str(edit_data)}
+    edited_result = airtable.update(edit_id, fields)
+    print("edited result in airtable_update", edited_result)
+    return edited_result
+
+
+@restricted
+def edit_workout(update: Update, context: CallbackContext):
+    user_data = context.user_data
+    print("before user data in edit workout", user_data)
+    new_edited_workout = update.message.text
+    print("edited workout in edit_workout", new_edited_workout)
+    user_data['edited_wod'] = new_edited_workout
+    print("after user_data", user_data)
+    print("required data: {},{}".format(user_data['edited_wod_id'],
+                                        user_data['edited_wod']))
+    if user_data['edited_wod'] != None:
+        try:
+            airtable_update(user_data['edited_wod_id'],
+                            user_data['edited_wod'])
+            update.message.reply_text(
+                "<b>Edited in Database...</b>\n\nEdited Workout:\n\n{}\n\n Enjoy your day!"
+                .format(user_data['edited_wod']),
+                reply_markup=ReplyKeyboardRemove(),
+                parse_mode=ParseMode.HTML)
+        except:
+            update.message.reply_text(
+                "Error with new input, please check again")
+    else:
+        update.message.reply_text("Input something!")
+    user_data.clear()
+    return ConversationHandler.END
 
 
 # delete workout (path : CHOOSING)
@@ -386,7 +473,10 @@ conv_handler = ConversationHandler(
             MessageHandler(Filters.text & (~Filters.command),
                            insert_new_workout),
         ],
-        DELETE_SELECTION: [CallbackQueryHandler(delete)]
+        DELETE_SELECTION: [CallbackQueryHandler(delete)],
+        EDIT_SELECTION: [CallbackQueryHandler(edit_selection)],
+        EDIT_WORKOUT:
+        [MessageHandler(Filters.text & (~Filters.command), edit_workout)]
     },
     fallbacks=[CommandHandler('cancel', cancel)])
 
@@ -408,9 +498,6 @@ def main():
 
     # command handler for conversation
     dp.add_handler(CommandHandler("conversion", conversion))
-
-    # command handler for create workout
-    # dp.add_handler(CommandHandler("create", create))
 
     dp.add_handler(conv_handler)
 
