@@ -51,7 +51,7 @@ def test(update, context):
 
 # /help function
 def start(update, context):
-    welcome_message = "Welcome! Here are the available commands: \n \u2022 /help \n \u2022 /view \n \u2022 /test \n \u2022 /conversion"
+    welcome_message = "Welcome! Here are the available commands: \n \u2022 /commands \n \u2022 /view \n \u2022 /test \n \u2022 /conversion"
     bot.send_message(chat_id=update.effective_chat.id, text=welcome_message)
 
 
@@ -83,7 +83,7 @@ def wod_result(database_id):
         return error_message
 
 
-# regex check for parameters whether date are formatted as yyyy-mm-dd
+# regex check for parameters whether date are formatted as yyyy-mm-dd to access airtable database
 def date_format_check(date):
     result = bool(
         re.search("^\d{4}\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01])$",
@@ -91,8 +91,8 @@ def date_format_check(date):
     return result
 
 
-# date converter for /view function from dd-mm-yyyy to yyyy-mm-dd
-def date_converter(date):
+# date converter for /view function from dd-mm-yyyy to yyyy-mm-dd for database access
+def date_converter_for_database(date):
     date_result = datetime.datetime.strptime(date,
                                              "%d-%m-%Y").strftime("%Y-%m-%d")
     return date_result
@@ -105,7 +105,6 @@ def view(update, context):
     print("context result", context_result)  # print the parameter in list
     print("user_message", update.message)  # obtain the chat and user info
     print("user_context", context)  # obtain the chat and user info
-
     if len(context_result) > 1:  # check the length of the context paramaters
         main_result = "Please key in one date only!"
     elif context_result == []:
@@ -122,7 +121,7 @@ def view(update, context):
             main_result_id = wod_id(airtable, search_date=search_query)
             main_result = wod_result(main_result_id)
         else:  # if date is DD-MM-YYYY
-            formatted_date = date_converter(search_query)
+            formatted_date = date_converter_for_database(search_query)
             main_result_id = wod_id(airtable, search_date=formatted_date)
             main_result = wod_result(main_result_id)
     # bot.send_message(chat_id=update.effective_chat.id, text=main_result)
@@ -173,12 +172,12 @@ def conversion_process(input):
 
 # /conversion function
 def conversion(update, context) -> int:
-    print("userdata", update.message.from_user)
+    print("user_data", update.message.from_user)
     context_result_for_conversion = context.args
     # print("context_result", context_result_for_conversion)
     # print("context_result_len", len(context_result_for_conversion))
     if len(context_result_for_conversion) == 0:
-        result = "Please key in your weight"
+        result = "Please key in a weight for conversion"
     else:
         print("conversion", context_result_for_conversion)
         user = update.message.from_user
@@ -240,7 +239,8 @@ def action(update: Update, context: CallbackContext):
         "{} workout ? Please input the date in <b>DD-MM-YYYY</b>".format(
             choice),
         quote=True,
-        parse_mode=ParseMode.HTML)
+        parse_mode=ParseMode.HTML,
+    )
     return DATE_SELECTION
 
 
@@ -280,7 +280,7 @@ def date_selection(update: Update, context: CallbackContext):
         deleting_date = user_data['date']
         print('deleting date', deleting_date)
         # convert deleted date to match with database format
-        formatted_deleting_date = date_converter(deleting_date)
+        formatted_deleting_date = date_converter_for_database(deleting_date)
         print("formatted deleted date", formatted_deleting_date)
         # search for id in database
         deleted_wod_id = wod_id(airtable, formatted_deleting_date)
@@ -313,7 +313,7 @@ def date_selection(update: Update, context: CallbackContext):
         print("user data in edit", user_data)
         editing_date = user_data['date']
         print("editing date", editing_date)
-        formatted_editing_date = date_converter(editing_date)
+        formatted_editing_date = date_converter_for_database(editing_date)
         print("formatted edited date", formatted_editing_date)
         edited_wod_id = wod_id(airtable, formatted_editing_date)
         print("edited wod id", edited_wod_id)
@@ -501,13 +501,13 @@ def main():
 
     dp.add_handler(conv_handler)
 
-    # updater.start_webhook(listen="0.0.0.0",
-    #                       port=os.getenv("PORT"),
-    #                       url_path=TELEGRAM_API_TOKEN,
-    #                       webhook_url="https://workout-notify.herokuapp.com/" +
-    #                       TELEGRAM_API_TOKEN)
+    updater.start_webhook(listen="0.0.0.0",
+                          port=os.getenv("PORT"),
+                          url_path=TELEGRAM_API_TOKEN,
+                          webhook_url="https://workout-notify.herokuapp.com/" +
+                          TELEGRAM_API_TOKEN)
 
-    updater.start_polling()
+    # updater.start_polling()
 
     updater.idle()
 
@@ -516,7 +516,7 @@ if __name__ == '__main__':
     main()
 """
 test - for testing purpose
-start - to check for available commands
+commands - to check for available commands
 view - to view workouts, date, should be formatted as dd-mm-yyyy
 conversion - unsure of the pounds-to-kg conversion? Formatted as xxx lbs / xxx kg
 """
