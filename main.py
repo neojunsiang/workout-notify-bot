@@ -103,9 +103,9 @@ def date_converter_for_database(date):
 def view(update, context):
     # extract parameters from /view function
     context_result = context.args
-    print("context result", context_result)  # print the parameter in list
-    print("user_message", update.message)  # obtain the chat and user info
-    print("user_context", context)  # obtain the chat and user info
+    # print("context result", context_result)  # print the parameter in list
+    # print("user_message", update.message)  # obtain the chat and user info
+    # print("user_context", context)  # obtain the chat and user info
     if len(context_result) > 1:  # check the length of the context paramaters
         main_result = "One date only!"
     elif context_result == []:
@@ -173,7 +173,7 @@ def conversion_process(input):
 
 # /convert function (main func)
 def conversion(update, context) -> int:
-    print("user_data", update.message.from_user)
+    # print("user_data", update.message.from_user)
     context_result_for_conversion = context.args
     # print("context_result", context_result_for_conversion)
     # print("context_result_len", len(context_result_for_conversion))
@@ -186,8 +186,6 @@ def conversion(update, context) -> int:
         input_weight = (update.message.text).lstrip("/convert ")
         # print("text1", input_weight)
         result = conversion_process(input_weight)
-        # print("result", result)
-        # pass
     return update.message.reply_text(result, parse_mode=ParseMode.HTML)
 
 
@@ -367,8 +365,6 @@ def insert_new_workout(update: Update, context: CallbackContext):
 @restricted
 def edit_selection_button(update: Update, context: CallbackContext):
     user_data = context.user_data
-    # print("user data in edit_selection", user_data)
-    # print("user data edited id in edit_selection", user_data['edited_wod_id'])
     query = update.callback_query
     # print("query in edit", query)
     if query.data.lower() == "edit":
@@ -397,13 +393,10 @@ def airtable_update(edit_id, edit_data):
 @restricted
 def edit_workout(update: Update, context: CallbackContext):
     user_data = context.user_data
-    print("before user data in edit workout", user_data)
     new_edited_workout = update.message.text
-    print("edited workout in edit_workout", new_edited_workout)
     user_data['edited_wod'] = new_edited_workout
-    print("after user_data", user_data)
-    print("required data: {},{}".format(user_data['edited_wod_id'],
-                                        user_data['edited_wod']))
+    # print("required data: {},{}".format(user_data['edited_wod_id'],
+    #                                     user_data['edited_wod']))
     if user_data['edited_wod'] != None:
         try:
             airtable_update(user_data['edited_wod_id'],
