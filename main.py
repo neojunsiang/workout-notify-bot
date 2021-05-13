@@ -52,7 +52,7 @@ def test(update, context):
 
 # /help function
 def start(update, context):
-    welcome_message = "Welcome! Here are the available commands: \n \u2022 /start \n \u2022 /view \n \u2022 /test \n \u2022 /conversion"
+    welcome_message = "Welcome! Here are the available commands: \n \u2022 /start \n \u2022 /view \n \u2022 /test \n \u2022 /convert"
     bot.send_message(chat_id=update.effective_chat.id, text=welcome_message)
 
 
