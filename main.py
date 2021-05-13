@@ -25,6 +25,7 @@ LIST_OF_ADMINS = [
     os.getenv("ADMIN_2"),
 ]
 
+# Airtable API keys
 AIRTABLE_BASE_KEY = os.getenv("SECRET_AIRTABLE_BASE_KEY")
 AIRTABLE_TABLE_NAME = os.getenv("SECRET_AIRTABLE_TABLE_NAME")
 AIRTABLE_API_KEY = os.getenv("SECRET_AIRTABLE_API_KEY")
@@ -45,7 +46,7 @@ airtable = Airtable(AIRTABLE_BASE_KEY, AIRTABLE_TABLE_NAME, AIRTABLE_API_KEY)
 # /start function
 def test(update, context):
     # print(bot.get_me())
-    test_message = "Testing Testing 1, 2, 3..."
+    test_message = "I am a bot and I am as strong as an 🦍"
     bot.send_message(chat_id=update.effective_chat.id, text=test_message)
 
 
@@ -106,13 +107,13 @@ def view(update, context):
     print("user_message", update.message)  # obtain the chat and user info
     print("user_context", context)  # obtain the chat and user info
     if len(context_result) > 1:  # check the length of the context paramaters
-        main_result = "Please key in one date only!"
+        main_result = "One date only!"
     elif context_result == []:
-        main_result = "please include a date as stated on the command description"
+        main_result = "Please include in a date in this format, <b><u>DD-MM-YYYY</u></b>"
     elif bool(re.search(
             "[ a-zA-Z ]",
             context_result[0])):  # check whether parameter are in alphabert
-        main_result = "please key in a date in this format, DD-MM-YYYY"
+        main_result = "Please include in a date in this format, <b><u>DD-MM-YYYY</u></b>"
     else:
         search_query = context_result[0]
         print("search query from view", search_query)
@@ -124,29 +125,29 @@ def view(update, context):
             formatted_date = date_converter_for_database(search_query)
             main_result_id = wod_id(airtable, search_date=formatted_date)
             main_result = wod_result(main_result_id)
-    # bot.send_message(chat_id=update.effective_chat.id, text=main_result)
-    update.message.reply_text(main_result)
+    update.message.reply_text(main_result, parse_mode=ParseMode.HTML)
 
 
-# regex check for kg
+# /convert MAIN FUNCTION
+# regex check for kg (assisting func)
 def weight_regex_check_for_kg(input):
     result = bool(re.search('^\d+(?:[.,][0|5])?\s*(kg|KG)$', input))
     return result
 
 
-# regex check for lbs
+# regex check for lbs (assisting func)
 def weight_regex_check_for_lbs(input):
     result = bool(re.search('^\d+(?:[.,][0|5])?\s*(lbs|LBS)$', input))
     return result
 
 
-# conversion to nearest 0.5/ 0.0
+# conversion to nearest 0.5/ 0.0 (assisting func)
 def round_to_nearest_point_five(value):
     result = round(value * 2.0) / 2.0
     return result
 
 
-# conversion process to relevant unit measurement
+# conversion process to relevant unit measurement (assisting func)
 def conversion_process(input):
     KILO_TO_POUND_CONVERSION = 2.20462
     if weight_regex_check_for_kg(input):
@@ -155,7 +156,7 @@ def conversion_process(input):
         converted_pound = round(integer_input * KILO_TO_POUND_CONVERSION, 1)
         final_converted_pound = round_to_nearest_point_five(converted_pound)
         # print("final converted pound", final_converted_pound)
-        result = f"Weight will be {final_converted_pound} lbs"
+        result = f"Converted weight is <b>{final_converted_pound} lbs</b>"
         return result
     elif weight_regex_check_for_lbs(input):
         integer_input = float(input.lower().strip("lbs"))
@@ -163,31 +164,31 @@ def conversion_process(input):
         final_converted_kilogram = round_to_nearest_point_five(
             converted_kilogram)
         # print("final converted kilogram", final_converted_kilogram)
-        result = f"Weight will be {final_converted_kilogram} kg"
+        result = f"Converted weight will be <b>{final_converted_kilogram} kg</b>"
         return result
     else:
-        error_message = "Only one input and check you unit, only kg or lbs!"
+        error_message = "Accepting only one input and please check the unit of measurement too, only <b>kg</b>/ <b>lbs</b> are allowed."
         return error_message
 
 
-# /conversion function
+# /convert function (main func)
 def conversion(update, context) -> int:
     print("user_data", update.message.from_user)
     context_result_for_conversion = context.args
     # print("context_result", context_result_for_conversion)
     # print("context_result_len", len(context_result_for_conversion))
     if len(context_result_for_conversion) == 0:
-        result = "Please key in a weight for conversion"
+        result = "Please include a desired weight for conversion, only <b>kg</b>/<b>lbs</b>!"
     else:
         print("conversion", context_result_for_conversion)
         user = update.message.from_user
         # print("user", user)
-        input_weight = (update.message.text).lstrip("/conversion ")
+        input_weight = (update.message.text).lstrip("/convert ")
         # print("text1", input_weight)
         result = conversion_process(input_weight)
         # print("result", result)
         # pass
-    return update.message.reply_text(result)
+    return update.message.reply_text(result, parse_mode=ParseMode.HTML)
 
 
 # Admin Access
@@ -201,7 +202,7 @@ def restricted(func):
             print(
                 "Unauthorized access denied for id: {}, username: {}.".format(
                     user_id, user_name))
-            error_message = "Only the admins have access"
+            error_message = "Admin Access Only 😊"
             update.message.reply_text(text=error_message)
             return
         return func(update, context, *args, **kwargs)
@@ -213,21 +214,22 @@ def restricted(func):
 CHOOSING, DATE_SELECTION, NEW_WORKOUT_SELECTION, DELETE_SELECTION, EDIT_SELECTION, EDIT_WORKOUT = range(
     6)
 
-reply_keyboard = [['New'], ['Edit'], ['Delete']]
-markup = ReplyKeyboardMarkup(reply_keyboard,
-                             one_time_keyboard=True,
-                             selective=True)
 
-
-# /create function
+# /create function (conversation initiator)
 @restricted
-def create(update: Update, _: CallbackContext):
-    message = "Please select your action, or send /cancel if you wish to stop at any point"
-    update.message.reply_text(message, reply_markup=markup)
+def create(update: Update, context: CallbackContext):
+    reply_keyboard = [['New'], ['Edit'], ['Delete']]
+    markup = ReplyKeyboardMarkup(reply_keyboard,
+                                 one_time_keyboard=True,
+                                 selective=True)
+    message = "Select your action, type <b><u>/cancel</u></b> if you wish to end the conversation"
+    update.message.reply_text(message,
+                              reply_markup=markup,
+                              parse_mode=ParseMode.HTML)
     return CHOOSING
 
 
-# new workout (path : CHOOSING)
+# new workout (path: CHOOSING)
 @restricted
 def action(update: Update, context: CallbackContext):
     user_data = context.user_data
@@ -236,21 +238,21 @@ def action(update: Update, context: CallbackContext):
     print("choice", choice)
     print("user_data in action", user_data)
     update.message.reply_text(
-        "{} workout ? Please input the date in <b>DD-MM-YYYY</b>".format(
-            choice),
+        "<b>{}</b> workout? Set the date in this format: <b><u>DD-MM-YYYY</u></b>"
+        .format(choice),
         quote=True,
         parse_mode=ParseMode.HTML,
     )
     return DATE_SELECTION
 
 
-# convert keyed date into the required date for insertion in airtable
+# convert keyed date into the required date for insertion in airtable frontend 'date' column
 def date_conversion_for_insert(date):
     result = datetime.datetime.strptime(date, "%d-%m-%Y").strftime("%m-%d-%Y")
     return result
 
 
-# airtable insertion
+# airtable insertion , add data into database
 def airtable_insertion(input_date, input_workout):
     converted_date = str(date_conversion_for_insert(input_date))
     record = {"date": converted_date, "wod": input_workout}
@@ -259,132 +261,128 @@ def airtable_insertion(input_date, input_workout):
     return
 
 
+def date_format_check_for_DD_MM_YYYY(date):
+    result = bool(
+        re.search("^(0?[1-9]|[12][0-9]|3[01])-(0?[1-9]|1[012])-\d\d\d\d$",
+                  date))
+    return result
+
+
 # ask for the date to be added into db
 @restricted
 def date_selection(update: Update, context: CallbackContext):
     user_data = context.user_data
-    if 'date' and 'wod' in user_data:
+    if 'date' and 'wod' in user_data:  # to clear any user_data outlying data
         del user_data['date']
         del user_data['wod']
-    print("before user_data from new_date", user_data)
-    text = update.message.text
-    print("text", text)
-    user_data['date'] = text
-    print('after user_data from new_date', user_data)
-    if user_data['choice'] == 'New':
-        update.message.reply_text("Please add the workout")
-        return NEW_WORKOUT_SELECTION
-    elif user_data['choice'] == 'Delete':  # result 14-05-2021
-        print("user_data in delete", user_data)
-        # store deleting_date in the context
-        deleting_date = user_data['date']
-        print('deleting date', deleting_date)
-        # convert deleted date to match with database format
-        formatted_deleting_date = date_converter_for_database(deleting_date)
-        print("formatted deleted date", formatted_deleting_date)
-        # search for id in database
-        deleted_wod_id = wod_id(airtable, formatted_deleting_date)
-        print("deleted_wod_id", deleted_wod_id)
-        if deleted_wod_id == None:
+    selected_date = update.message.text
+    if date_format_check_for_DD_MM_YYYY(selected_date) == False:
+        update.message.reply_text(
+            "<b>Invalid date</b>, please key in a date in this format: <b>DD-MM-YYYY</b>",
+            parse_mode=ParseMode.HTML)
+    else:
+        user_data['date'] = selected_date
+        if user_data['choice'] == 'New':
             update.message.reply_text(
-                "No WOD found in database, please key in another date in <b>DD-MM-YYYY</b>",
-                parse_mode=ParseMode.HTML)
-        else:
-            # store deleted_wod_id in user_data
-            user_data['delete_wod_id'] = deleted_wod_id
-            deleted_wod = wod_result(deleted_wod_id)  #last appended wod
-            # print('deleted wod', deleted_wod)
-            user_data['deleted_wod'] = deleted_wod
-            print("user_data in delete filtered", user_data)
-            inline_keyboard = [
-                [
-                    InlineKeyboardButton("Yes", callback_data='Yes'),
-                    InlineKeyboardButton("No", callback_data='No'),
-                ],
-            ]
-            inline_reply_markup = InlineKeyboardMarkup(inline_keyboard)
-            update.message.reply_text(
-                "<b>Workout to be deleted</b>\n\n{}\n\n<b><i>Confirm Deletion?</i></b>"
-                .format(deleted_wod),
-                reply_markup=inline_reply_markup,
-                parse_mode=ParseMode.HTML)
-            return DELETE_SELECTION
-    elif user_data['choice'] == 'Edit':
-        print("user data in edit", user_data)
-        editing_date = user_data['date']
-        print("editing date", editing_date)
-        formatted_editing_date = date_converter_for_database(editing_date)
-        print("formatted edited date", formatted_editing_date)
-        edited_wod_id = wod_id(airtable, formatted_editing_date)
-        print("edited wod id", edited_wod_id)
-        if edited_wod_id == None:
-            update.message.reply_text(
-                "No WOD found in database, please key in another date in <b>DD-MM-YYYY</b>",
-                parse_mode=ParseMode.HTML)
-        else:
-            user_data['edited_wod_id'] = edited_wod_id
-            edited_wod = wod_result(edited_wod_id)
-            user_data['edited_wod'] = edited_wod
-            print("user_data in edited filtered", user_data)
-            inline_keyboard = [
-                [
-                    InlineKeyboardButton("Edit", callback_data='Edit'),
-                    InlineKeyboardButton("Pass", callback_data='Pass'),
-                ],
-            ]
-            inline_reply_markup = InlineKeyboardMarkup(inline_keyboard)
-            update.message.reply_text(
-                "<b>Workout to be Edited</b>\n\n{}\n\n<b><i>Confirm Edit?</i></b>"
-                .format(edited_wod),
-                reply_markup=inline_reply_markup,
-                parse_mode=ParseMode.HTML)
-            return EDIT_SELECTION
+                "Key in the workout that you wish to add 🏋️")
+            return NEW_WORKOUT_SELECTION
+        elif user_data['choice'] == 'Delete':
+            deleting_date = user_data[
+                'date']  # store deleting_date in the context
+            formatted_deleting_date = date_converter_for_database(
+                deleting_date
+            )  # convert deleted date to match with database format
+            deleted_wod_id = wod_id(
+                airtable, formatted_deleting_date)  # search for id in database
+            if deleted_wod_id == None:
+                update.message.reply_text(
+                    "No workout found in the database. Key in another date in this format: <b><u>DD-MM-YYYY</u></b>",
+                    parse_mode=ParseMode.HTML)
+            else:
+                # store deleted_wod_id in user_data
+                user_data['delete_wod_id'] = deleted_wod_id
+                deleted_wod = wod_result(deleted_wod_id)  #last appended wod
+                user_data['deleted_wod'] = deleted_wod
+                delete_inline_keyboard = [
+                    [
+                        InlineKeyboardButton("Yes", callback_data='Yes'),
+                        InlineKeyboardButton("No", callback_data='No'),
+                    ],
+                ]
+                delete_inline_reply_markup = InlineKeyboardMarkup(
+                    delete_inline_keyboard)
+                update.message.reply_text(
+                    "<b><u>Workout to be deleted</u></b>\n\n{}\n\n<i>Confirm deletion?</i> 😱"
+                    .format(deleted_wod),
+                    reply_markup=delete_inline_reply_markup,
+                    parse_mode=ParseMode.HTML)
+                return DELETE_SELECTION
+        elif user_data['choice'] == 'Edit':
+            editing_date = user_data['date']
+            formatted_editing_date = date_converter_for_database(editing_date)
+            edited_wod_id = wod_id(airtable, formatted_editing_date)
+            if edited_wod_id == None:
+                update.message.reply_text(
+                    "No WOD found in database, please key in another date in <b>DD-MM-YYYY</b>",
+                    parse_mode=ParseMode.HTML)
+            else:
+                user_data['edited_wod_id'] = edited_wod_id
+                edited_wod = wod_result(edited_wod_id)
+                user_data['edited_wod'] = edited_wod
+                edit_inline_keyboard = [
+                    [
+                        InlineKeyboardButton("Edit", callback_data='Edit'),
+                        InlineKeyboardButton("Pass", callback_data='Pass'),
+                    ],
+                ]
+                edit_inline_reply_markup = InlineKeyboardMarkup(
+                    edit_inline_keyboard)
+                update.message.reply_text(
+                    "<b><u>Workout to be edited for <i>{}</i></u></b>:\n\n{}\n\n<i>Confirm edit?</i> 🤔"
+                    .format(user_data['date'], edited_wod),
+                    reply_markup=edit_inline_reply_markup,
+                    parse_mode=ParseMode.HTML)
+                return EDIT_SELECTION
 
 
 # ask for the workout to be added into db
 @restricted
 def insert_new_workout(update: Update, context: CallbackContext):
     user_data = context.user_data
-    print("before for user_date in insert_new_workout", user_data)
     new_workout = update.message.text
-    print("new workout", new_workout)
     user_data['wod'] = new_workout
-    print("after for user_date in insert_new_workout", user_data)
     try:
         airtable_insertion(user_data['date'], user_data['wod'])
-        update.message.reply_text("<b>Added to DB</b>",
+        update.message.reply_text("🎉 <b>Workout added to the database</b> 🎉",
                                   reply_markup=ReplyKeyboardRemove(),
                                   parse_mode=ParseMode.HTML)
     except:
         update.message.reply_text(
-            "Error with date or data, please check again")
+            "Error with date or data, kindly check them again 😟")
     user_data.clear()
     return ConversationHandler.END
 
 
 # edit workout (path : CHOOSING)
 @restricted
-def edit_selection(update: Update, context: CallbackContext):
+def edit_selection_button(update: Update, context: CallbackContext):
     user_data = context.user_data
-    print("user data in edit_selection", user_data)
-    print("user data edited id in edit_selection", user_data['edited_wod_id'])
+    # print("user data in edit_selection", user_data)
+    # print("user data edited id in edit_selection", user_data['edited_wod_id'])
     query = update.callback_query
-    print("query in edit", query)
+    # print("query in edit", query)
     if query.data.lower() == "edit":
         query.answer()
         query.edit_message_text(
-            text="Kindly input the new workout for:\n\n<i>{}</i>".format(
-                user_data['edited_wod']),
+            text="Kindly input the new workout for <b>{}</b>:\n\n<i>{}</i>".
+            format(user_data['date'], user_data['edited_wod']),
             parse_mode=ParseMode.HTML)
         return EDIT_WORKOUT
     elif query.data.lower() == "pass":
         query.answer()
-        query.edit_message_text(text="No edit required, Goodbye!")
+        query.edit_message_text(text="No edit needed, Goodbye! 👋")
         user_data.clear()
         return ConversationHandler.END
-
-    # update.message.reply_text("Please input the date you wish to edit")
-    # return EDIT_SELECTION
 
 
 # update airtable function
@@ -395,6 +393,7 @@ def airtable_update(edit_id, edit_data):
     return edited_result
 
 
+# edit
 @restricted
 def edit_workout(update: Update, context: CallbackContext):
     user_data = context.user_data
@@ -410,41 +409,40 @@ def edit_workout(update: Update, context: CallbackContext):
             airtable_update(user_data['edited_wod_id'],
                             user_data['edited_wod'])
             update.message.reply_text(
-                "<b>Edited in Database...</b>\n\nEdited Workout:\n\n{}\n\n Enjoy your day!"
+                "<b>Edited in Database... Revised workout:</b>\n\n{}\n\nEnjoy your day! 🤖"
                 .format(user_data['edited_wod']),
                 reply_markup=ReplyKeyboardRemove(),
                 parse_mode=ParseMode.HTML)
         except:
             update.message.reply_text(
-                "Error with new input, please check again")
+                "Something wrong with the input, please check again!")
     else:
-        update.message.reply_text("Input something!")
+        update.message.reply_text("You need to key in something!")
     user_data.clear()
     return ConversationHandler.END
 
 
 # delete workout (path : CHOOSING)
 @restricted
-def delete(update: Update, context: CallbackContext):
+def delete_button(update: Update, context: CallbackContext):
     user_data = context.user_data
-    print("user data in delete", user_data)
-    print("user data deleted id in delete", user_data['delete_wod_id'])
     query = update.callback_query
-    print("query in delete", query)
     if query.data.lower() == "yes":
         try:
             airtable.delete(user_data['delete_wod_id'])
             query.answer()
             query.edit_message_text(
-                text="Selected option has been deleted from database")
+                text=
+                "Selected workout has been deleted from the database... 😢 Goodbye... 👋"
+            )
             user_data.clear()
         except:
             query.answer()
-            query.edit_message_text(text="No record found in database")
+            query.edit_message_text(text="No record was found in database")
             user_data.clear()
     elif query.data.lower() == "no":
         query.answer()
-        query.edit_message_text(text="Not deleting from database, Goodbye!")
+        query.edit_message_text(text="Not deleting from database, Goodbye! 👋")
         user_data.clear()
     return ConversationHandler.END
 
@@ -453,14 +451,12 @@ def delete(update: Update, context: CallbackContext):
 @restricted
 def cancel(update: Update, context: CallbackContext):
     user_data = context.user_data
-    print("userdata", user_data)
-    # if 'choice' in user_data:
-    #     del user_data['choice']
-    update.message.reply_text("Goodbye", reply_markup=ReplyKeyboardRemove())
+    update.message.reply_text("Goodbye 👋", reply_markup=ReplyKeyboardRemove())
     user_data.clear()
     return ConversationHandler.END
 
 
+# conversation flow for new, edit and delete
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler('create', create)],
     states={
@@ -473,8 +469,8 @@ conv_handler = ConversationHandler(
             MessageHandler(Filters.text & (~Filters.command),
                            insert_new_workout),
         ],
-        DELETE_SELECTION: [CallbackQueryHandler(delete)],
-        EDIT_SELECTION: [CallbackQueryHandler(edit_selection)],
+        DELETE_SELECTION: [CallbackQueryHandler(delete_button)],
+        EDIT_SELECTION: [CallbackQueryHandler(edit_selection_button)],
         EDIT_WORKOUT:
         [MessageHandler(Filters.text & (~Filters.command), edit_workout)]
     },
@@ -497,17 +493,17 @@ def main():
     dp.add_handler(CommandHandler("view", view))
 
     # command handler for conversation
-    dp.add_handler(CommandHandler("conversion", conversion))
+    dp.add_handler(CommandHandler("convert", conversion))
 
     dp.add_handler(conv_handler)
 
-    updater.start_webhook(listen="0.0.0.0",
-                          port=os.getenv("PORT"),
-                          url_path=TELEGRAM_API_TOKEN,
-                          webhook_url="https://workout-notify.herokuapp.com/" +
-                          TELEGRAM_API_TOKEN)
+    # updater.start_webhook(listen="0.0.0.0",
+    #                       port=os.getenv("PORT"),
+    #                       url_path=TELEGRAM_API_TOKEN,
+    #                       webhook_url="https://workout-notify.herokuapp.com/" +
+    #                       TELEGRAM_API_TOKEN)
 
-    # updater.start_polling()
+    updater.start_polling()
 
     updater.idle()
 
@@ -515,8 +511,8 @@ def main():
 if __name__ == '__main__':
     main()
 """
-test - for testing purpose
-start - to check for available commands
-view - to view workouts, date, should be formatted as dd-mm-yyyy
-conversion - unsure of the pounds-to-kg conversion? Formatted as xxx lbs / xxx kg
+test - to test if the bot is awake
+start - check for all available commands
+view - format date as dd-mm-yyyy to view workouts
+convert - format weight as xxx lbs / xxx kg for conversion
 """
