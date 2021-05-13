@@ -84,11 +84,25 @@ def wod_result(database_id):
         return error_message
 
 
-# regex check for parameters whether date are formatted as yyyy-mm-dd to access airtable database
+# regex check for parameters, whether date are formatted as yyyy-mm-dd to access airtable database
 def date_format_check(date):
     result = bool(
         re.search("^\d{4}\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01])$",
                   date))
+    return result
+
+
+# regex check for parameter, whether the date is formatted in DD-MM-YYYY
+def date_format_check_for_DD_MM_YYYY(date):
+    result = bool(
+        re.search("^(0?[1-9]|[12][0-9]|3[01])-(0?[1-9]|1[012])-\d\d\d\d$",
+                  date))
+    return result
+
+
+# regex check for parameters, to ensure that no alphabets is entered as date
+def regex_check_for_alphabert_input(input):
+    result = bool(re.search("[ a-zA-Z ]", input))
     return result
 
 
@@ -110,9 +124,9 @@ def view(update, context):
         main_result = "One date only!"
     elif context_result == []:
         main_result = "Please include in a date in this format, <b><u>DD-MM-YYYY</u></b>"
-    elif bool(re.search(
-            "[ a-zA-Z ]",
-            context_result[0])):  # check whether parameter are in alphabert
+    elif regex_check_for_alphabert_input(
+            context_result[0]) == True or date_format_check_for_DD_MM_YYYY(
+                context_result[0]) == False:
         main_result = "Please include in a date in this format, <b><u>DD-MM-YYYY</u></b>"
     else:
         search_query = context_result[0]
@@ -152,10 +166,8 @@ def conversion_process(input):
     KILO_TO_POUND_CONVERSION = 2.20462
     if weight_regex_check_for_kg(input):
         integer_input = float(input.lower().strip("kg"))
-        # print("conversion", integer_input)
         converted_pound = round(integer_input * KILO_TO_POUND_CONVERSION, 1)
         final_converted_pound = round_to_nearest_point_five(converted_pound)
-        # print("final converted pound", final_converted_pound)
         result = f"Converted weight is <b>{final_converted_pound} lbs</b>"
         return result
     elif weight_regex_check_for_lbs(input):
@@ -163,7 +175,6 @@ def conversion_process(input):
         converted_kilogram = round(integer_input / KILO_TO_POUND_CONVERSION, 1)
         final_converted_kilogram = round_to_nearest_point_five(
             converted_kilogram)
-        # print("final converted kilogram", final_converted_kilogram)
         result = f"Converted weight will be <b>{final_converted_kilogram} kg</b>"
         return result
     else:
@@ -181,7 +192,7 @@ def conversion(update, context) -> int:
         result = "Please include a desired weight for conversion, only <b>kg</b>/<b>lbs</b>!"
     else:
         print("conversion", context_result_for_conversion)
-        user = update.message.from_user
+        # user = update.message.from_user
         # print("user", user)
         input_weight = (update.message.text).lstrip("/convert ")
         # print("text1", input_weight)
@@ -259,13 +270,6 @@ def airtable_insertion(input_date, input_workout):
     return
 
 
-def date_format_check_for_DD_MM_YYYY(date):
-    result = bool(
-        re.search("^(0?[1-9]|[12][0-9]|3[01])-(0?[1-9]|1[012])-\d\d\d\d$",
-                  date))
-    return result
-
-
 # ask for the date to be added into db
 @restricted
 def date_selection(update: Update, context: CallbackContext):
@@ -310,8 +314,8 @@ def date_selection(update: Update, context: CallbackContext):
                 delete_inline_reply_markup = InlineKeyboardMarkup(
                     delete_inline_keyboard)
                 update.message.reply_text(
-                    "<b><u>Workout to be deleted</u></b>\n\n{}\n\n<i>Confirm deletion?</i> 😱"
-                    .format(deleted_wod),
+                    "<b><u>Workout to be deleted for {}:</u></b>\n\n{}\n\n<i>Confirm deletion?</i> 😱"
+                    .format(user_data['date'], deleted_wod),
                     reply_markup=delete_inline_reply_markup,
                     parse_mode=ParseMode.HTML)
                 return DELETE_SELECTION
@@ -351,9 +355,11 @@ def insert_new_workout(update: Update, context: CallbackContext):
     user_data['wod'] = new_workout
     try:
         airtable_insertion(user_data['date'], user_data['wod'])
-        update.message.reply_text("🎉 <b>Workout added to the database</b> 🎉",
-                                  reply_markup=ReplyKeyboardRemove(),
-                                  parse_mode=ParseMode.HTML)
+        update.message.reply_text(
+            "🎉 <b>Workout on {} added to the database</b> 🎉".format(
+                user_data['date']),
+            reply_markup=ReplyKeyboardRemove(),
+            parse_mode=ParseMode.HTML)
     except:
         update.message.reply_text(
             "Error with date or data, kindly check them again 😟")
@@ -370,8 +376,8 @@ def edit_selection_button(update: Update, context: CallbackContext):
     if query.data.lower() == "edit":
         query.answer()
         query.edit_message_text(
-            text="Kindly input the new workout for <b>{}</b>:\n\n<i>{}</i>".
-            format(user_data['date'], user_data['edited_wod']),
+            text="New workout input for <b>{}</b>:\n\n<i>{}</i>".format(
+                user_data['date'], user_data['edited_wod']),
             parse_mode=ParseMode.HTML)
         return EDIT_WORKOUT
     elif query.data.lower() == "pass":
@@ -402,8 +408,8 @@ def edit_workout(update: Update, context: CallbackContext):
             airtable_update(user_data['edited_wod_id'],
                             user_data['edited_wod'])
             update.message.reply_text(
-                "<b>Edited in Database... Revised workout:</b>\n\n{}\n\nEnjoy your day! 🤖"
-                .format(user_data['edited_wod']),
+                "<b>Edited in Database... Revised workout for {}:</b>\n\n{}\n\nEnjoy your day! 🤖"
+                .format(user_data['date'], user_data['edited_wod']),
                 reply_markup=ReplyKeyboardRemove(),
                 parse_mode=ParseMode.HTML)
         except:
@@ -426,8 +432,9 @@ def delete_button(update: Update, context: CallbackContext):
             query.answer()
             query.edit_message_text(
                 text=
-                "Selected workout has been deleted from the database... 😢 Goodbye... 👋"
-            )
+                "Selected workout on <b>{}</b> has been deleted from the database... 😢 Goodbye... 👋"
+                .format(user_data['date']),
+                parse_mode=ParseMode.HTML)
             user_data.clear()
         except:
             query.answer()
