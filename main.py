@@ -80,7 +80,7 @@ def wod_result(database_id):
         result = record['fields']['wod']
         return result
     else:
-        error_message = "No WOD. How about some rest instead?"
+        error_message = "No Workout for today! How about get some rest 💤 ?"
         return error_message
 
 
@@ -356,7 +356,7 @@ def insert_new_workout(update: Update, context: CallbackContext):
     try:
         airtable_insertion(user_data['date'], user_data['wod'])
         update.message.reply_text(
-            "🎉 <b>Workout on {} added to the database</b> 🎉".format(
+            "🎉 <b>Workout for {} has been added to the database</b> 🎉".format(
                 user_data['date']),
             reply_markup=ReplyKeyboardRemove(),
             parse_mode=ParseMode.HTML)
@@ -382,7 +382,7 @@ def edit_selection_button(update: Update, context: CallbackContext):
         return EDIT_WORKOUT
     elif query.data.lower() == "pass":
         query.answer()
-        query.edit_message_text(text="No edit needed, Goodbye! 👋")
+        query.edit_message_text(text="No edit has been performed, Goodbye! 👋")
         user_data.clear()
         return ConversationHandler.END
 
@@ -432,7 +432,7 @@ def delete_button(update: Update, context: CallbackContext):
             query.answer()
             query.edit_message_text(
                 text=
-                "Selected workout on <b>{}</b> has been deleted from the database... 😢 Goodbye... 👋"
+                "Selected workout for <b>{}</b> has been deleted from the database... 😢 Goodbye... 👋"
                 .format(user_data['date']),
                 parse_mode=ParseMode.HTML)
             user_data.clear()
