@@ -134,11 +134,11 @@ def view(update, context):
         # # check the date formatting parameters
         if date_format_check(search_query):  # if date is YYYY-MM-DD
             main_result_id = wod_id(airtable, search_date=search_query)
-            main_result = wod_result(main_result_id)
+            main_result = f"💦 <u><b>Workout of the Day:</b></u>\n\n{wod_result(main_result_id)}"
         else:  # if date is DD-MM-YYYY
             formatted_date = date_converter_for_database(search_query)
             main_result_id = wod_id(airtable, search_date=formatted_date)
-            main_result = wod_result(main_result_id)
+            main_result = f"💦 <u><b>Workout of the Day:</b></u>\n\n{wod_result(main_result_id)}"
     update.message.reply_text(main_result, parse_mode=ParseMode.HTML)
 
 
